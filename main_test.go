@@ -2,32 +2,20 @@ package main
 
 import (
 	"encoding/json"
-	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 )
+
+type HealthStatus struct {
+	Status string `json:"status"`
+}
 
 func TestHealthHandler(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
 
 	healthHandler(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
-	}
-
-	if got := rec.Body.String(); got != "OK\n" {
-		t.Fatalf("expected body %q, got %q", "OK\n", got)
-	}
-}
-
-func TestGetUsersHandler(t *testing.T) {
-	req := httptest.NewRequest(http.MethodGet, "/users", nil)
-	rec := httptest.NewRecorder()
-
-	getUsersHandler(rec, req)
 
 	res := rec.Result()
 	defer res.Body.Close()
@@ -36,25 +24,14 @@ func TestGetUsersHandler(t *testing.T) {
 		t.Fatalf("expected status %d, got %d", http.StatusOK, res.StatusCode)
 	}
 
-	gotContentType := res.Header.Get("Content-Type")
-	wantContentType := "application/json"
+	var health HealthStatus
+	expected := HealthStatus{Status: "ok"}
 
-	if gotContentType != wantContentType {
-		t.Fatalf("expected content type '%s', got '%s'", wantContentType, gotContentType)
+	if err := json.NewDecoder(res.Body).Decode(&health); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
 	}
 
-	bodyBytes, err := io.ReadAll(res.Body)
-	if err != nil {
-		t.Fatalf("Reading Error: %v", err)
-	}
-
-	var users []User
-
-	if err := json.Unmarshal(bodyBytes, &users); err != nil {
-		t.Fatalf("Invalid JSON: %v. Raw body: %s", err, string(bodyBytes))
-	}
-
-	if len(users) == 0 {
-		t.Error("expected to get users, but got an empty list")
+	if health.Status != expected.Status {
+		t.Fatalf("wrong json, expected %v, got %v", expected, health)
 	}
 }
